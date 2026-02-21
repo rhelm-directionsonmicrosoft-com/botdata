@@ -9,16 +9,31 @@ import json
 import eml_parser
 import extract_msg as emsg
 from pprint import pprint as pp
+import re
 
 
-inpath = r"C:\Users\Rob\script\botdata\interests"
-outpath  = r"C:\Users\Rob\script\botdata\interests_out.txt"
+inpath = r"C:\Users\Rob\script\data\botdata_files\interests"
+outpath  = r"C:\Users\Rob\script\data\botdata_files\interests_out.txt"
 
 def combine_message_files(inpath=inpath, outpath=outpath):
     result = concat_files(inpath,list([]))
     with open(outpath, mode='w', encoding='utf-8') as outf:
-        outf.write(str(result))
+        pp(result, stream=outf)
     outf.close()
+    return(result)
+
+pattern = re.compile(r'\s\s\s*')
+
+def clean_message_body(message):
+    def cleaner(matched):
+        if '\n' in matched.group(0):
+            return('\n')
+        else:
+            return(' ')
+    
+    body = re.sub(pattern, cleaner, message.body)
+    return(body)
+    
 
 def concat_files(inpath, result):
     for filename in os.scandir(inpath):
@@ -44,6 +59,7 @@ def append_eml(path, extension, result):
     print('EMLParser loaded')
     parsed_eml = ep.decode_email_bytes(raw_email)
     print('EML Parsed message:')
+    parsed_eml['body'] = parsed_eml['body'] # clean_message_body()
     result.append(parsed_eml)
     return(result)
 
@@ -52,9 +68,10 @@ def append_msg(path, extension, result):
         message_file = emsg.openMsg(path)
         print(f'raw MSG file read')
         msg = dict({})
-        msg['body'] = (message_file.body)
+        msg['body'] = message_file.body #clean_message_body()
         msg['subject'] = (message_file.subject)
         msg['receivedTime'] = (message_file.receivedTime)
+        msg['rtfBody'] = (message_file.rtfBody)
         result.append(msg)
     finally:
         message_file.close()
@@ -76,4 +93,4 @@ def message_file_type(filename):
 
 
 if __name__ == '__main__':
-    combine_message_files()
+    result = combine_message_files()
