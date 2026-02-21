@@ -12,8 +12,8 @@ from pprint import pprint as pp
 import re
 
 
-inpath = r"C:\Users\Rob\script\data\botdata_files\interests"
-outpath  = r"C:\Users\Rob\script\data\botdata_files\interests_out.txt"
+inpath = r"/Users/robhelm/dev/data/botdata/interests"
+outpath  = r"/Users/robhelm/dev/data/botdata/interests/interests_out.txt"
 
 def combine_message_files(inpath=inpath, outpath=outpath):
     result = concat_files(inpath,list([]))
@@ -22,16 +22,12 @@ def combine_message_files(inpath=inpath, outpath=outpath):
     outf.close()
     return(result)
 
-pattern = re.compile(r'\s\s\s*')
+pattern = re.compile(r'\r\n')
 
-def clean_message_body(message):
+def clean_message_body(body):
     def cleaner(matched):
-        if '\n' in matched.group(0):
-            return('\n')
-        else:
-            return(' ')
-    
-    body = re.sub(pattern, cleaner, message.body)
+        return('\n')
+    body = re.sub(pattern, cleaner, body)
     return(body)
     
 
@@ -39,6 +35,7 @@ def concat_files(inpath, result):
     for filename in os.scandir(inpath):
         extension = message_file_type(filename)
         if extension == '.eml':
+            is_eml = True
             print(f'is eml file')
             result = append_eml(filename.path, extension, result)
         elif extension == '.msg':
@@ -54,21 +51,20 @@ def append_eml(path, extension, result):
     with open(path, 'rb') as eml_file:
         raw_email = eml_file.read()
     eml_file.close()
-    print(f'raw EML file read')
+    #print(f'raw EML file read')
     ep = eml_parser.EmlParser()
-    print('EMLParser loaded')
+    #print('EMLParser loaded')
     parsed_eml = ep.decode_email_bytes(raw_email)
-    print('EML Parsed message:')
-    parsed_eml['body'] = parsed_eml['body'] # clean_message_body()
+    #print('EML Parsed message:')
     result.append(parsed_eml)
     return(result)
 
 def append_msg(path, extension, result):
     try:
         message_file = emsg.openMsg(path)
-        print(f'raw MSG file read')
+        #print(f'raw MSG file read')
         msg = dict({})
-        msg['body'] = message_file.body #clean_message_body()
+        msg['body'] = message_file.body
         msg['subject'] = (message_file.subject)
         msg['receivedTime'] = (message_file.receivedTime)
         msg['rtfBody'] = (message_file.rtfBody)
