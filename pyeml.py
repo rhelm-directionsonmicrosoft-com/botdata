@@ -26,7 +26,7 @@ class InterestsEmlParser()
     def combine_message_files(self, inpath=inpath_default, outpath=outpath_default):
         result = concat_files(inpath, list([]))
         with open(outpath, mode='w', encoding='utf-8') as outf:
-            pp(result, stream=outf)
+            print(result, stream=outf)
         outf.close()
         return(result)
     
