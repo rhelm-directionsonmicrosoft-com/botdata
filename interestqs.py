@@ -3,74 +3,88 @@
 # Writes to CSV file
 
 import os, os.path
-import pandas as pd
-import datetime
-import json
-import eml_parser
-import extract_msg as emsg
+import csv
+import extract_msg as msg
+import email
+import email.policy
+import email.parser
 from pprint import pprint as pp
 import re
 
+fields = {
+    'Question': (extract_question,  'body')
+    'Subject', (lambda x: x, 'subject')
+    'Sender', (lambda x: x, 'sender')
+    'To', (lambda x: x, 'to')
+    }
 
 inpath = r"/Users/robhelm/dev/data/botdata/interests"
-outpath  = r"/Users/robhelm/dev/data/botdata/interests/interests_out.txt"
+outpath  = r"/Users/robhelm/dev/data/botdata/interests/interests_out.csv"
 
-def combine_message_files(inpath=inpath, outpath=outpath):
-    result = concat_files(inpath,list([]))
-    with open(outpath, mode='w', encoding='utf-8') as outf:
-        pp(result, stream=outf)
-    outf.close()
-    return(result)
-
-pattern = re.compile(r'\r\n')
-
-def clean_message_body(body):
-    def cleaner(matched):
-        return('\n')
-    body = re.sub(pattern, cleaner, body)
-    return(body)
+class EmlMessageSource():
+    def __init__(self, path):
+        self.eml_parser = email.parse.EmlParser()
+        with open(path, mode='rb') as eml_file:
+            raw_email = eml_file.read()
+        # Handle multipart message  TODO
+        # decode and return TODO
+    def close(self):
+        pass
+    # handle dict read TODO      
     
 
-def concat_files(inpath, result):
+def get_messages(inpath=inpath, outpath=outpath):
+    with open(outpath, 'w', newline='', encoding='utf-8') as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=columns, dialect='excel')
+        writer.writeheader()
+        result = list([])
+        for message in read_messages:
+            writer.writerow(message)
+            result.append(message) #debug
+    csv_file.close()
+    return(result)
+
+def read_messages(inpath, result):
     for filename in os.scandir(inpath):
-        extension = message_file_type(filename)
-        if extension == '.eml':
-            is_eml = True
-            print(f'is eml file')
-            result = append_eml(filename.path, extension, result)
-        elif extension == '.msg':
-            print(f'is msg file')
-            result = append_msg(filename.path, extension, result)
+        message = read_message(filename)
+        yield(message)
+
+def read_message(filename):
+    path = filename.path
+    ext = filename.extension
+    try:    
+        if ext == '.msg': # Outlook binary format
+            message_source = msg.openMsg(path)
+        elif ext == '.eml':
+                message_source = EmlMessageSource(path)
+
         else:
-            print('is not message file')    
-        print(f'result contains {len(result)} messages')
-    return(result)
-
-def append_eml(path, extension, result):
-    # print(f'append_eml {path}{extension} {result}')
-    with open(path, 'rb') as eml_file:
-        raw_email = eml_file.read()
-    eml_file.close()
-    #print(f'raw EML file read')
-    ep = eml_parser.EmlParser()
-    #print('EMLParser loaded')
-    parsed_eml = ep.decode_email_bytes(raw_email)
-    #print('EML Parsed message:')
-    result.append(parsed_eml)
-    return(result)
-
-def append_msg(path, extension, result):
-    try:
-        message_file = emsg.openMsg(path)
-        #print(f'raw MSG file read')
-        msg = dict({})
-        msg['body'] = message_file.body
-        msg['subject'] = (message_file.subject)
-        msg['receivedTime'] = (message_file.receivedTime)
-        msg['rtfBody'] = (message_file.rtfBody)
-        result.append(msg)
+            print(f'Not a message file')
+            message_source = None
+        if message_source:
+            message = dict({})
+            for (field, (reader, source_field)) in sorted(fields.items()):
+                message[k] = reader(message_source[source_field])
     finally:
-        message_file.close()
+        message_source.close()
+    return(message)
+
+def target_message(message):
+    m = re.match(subject.pat,message.subject)
+    return(m)
+ 
+def append_message(message, result):
+    if self.target_message(message):
+        message['question'] = extract_question(message['body'])
+        result.append(message)
+        #DBG
+        if len(question) > 70:
+            print(f'question: {question[:70]}')
+        else:
+            print(f'question: {question}')
+        print(f'subject: {message.subject}')
+        print(f'sender: {message.sender}')
+        print(f'to: {message.to}')
     return(result)
     
 def message_file_type(filename):
@@ -78,13 +92,13 @@ def message_file_type(filename):
     if os.path.isfile(path):
         (base,extension) = os.path.splitext(path)
         if extension == '.msg' or extension == '.eml':
-            print(f'message_file_type: {extension}')
+            # print(f'message_file_type: {extension}')
             return(extension)
         else:
-            print('message_file_type: not a message file type')
+            # print('message_file_type: not a message file type')
             return('')
     else:
-        print('message_file_type: not a file')
+        # print('message_file_type: not a file')
         return('')
 
 
