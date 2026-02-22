@@ -4,7 +4,6 @@
 
 import email.parser
 import email
-from html.parser import HTMLParser
 import os, os.path
 # import pandas as pd
 # import datetime
@@ -15,23 +14,21 @@ from pprint import pprint as pp
 import re
 
 
+
+
 class InterestsEmlParser()
-    inpath_default = r"C:\Users\Rob\script\data\botdata_files\interests"
-    outpath_default  = r"C:\Users\Rob\script\data\botdata_files\interests_out.txt"
-    clean_pattern = re.compile(r'\s\s\s*')
+    inpath_default = r"/Users/robhelm/dev/data/botdata/interests/"
+    outpath_default  = r"/Users/robhelm/dev/data/botdata/interests/interests_out.txt"
 
     def __init__(self):
         self.parser = email.parser.BytesParser(policy=email.policy.default)
-        self.html_parser
-        
+
     def combine_message_files(self, inpath=inpath_default, outpath=outpath_default):
         result = concat_files(inpath, list([]))
-
         with open(outpath, mode='w', encoding='utf-8') as outf:
             pp(result, stream=outf)
         outf.close()
         return(result)
-
     
 def concat_files(inpath, result):
     dbg_limit = 1
@@ -49,22 +46,9 @@ def concat_files(inpath, result):
             result = append_msg(filename.path, extension, result)
             '''
         else:
-            print('is not message file')   #DBG 
+            print('is not eml file')   #DBG 
         print(f'result contains {len(result)} messages') # DBG
     return(result)
-
-
-# Convert html to plain text and clean out extra line breaks and whitespace
-
-    def clean_message_body(self, body_text):
-        body = re.sub(self.pattern, self.cleaner, body_text)
-        return(body)
-
-    def cleaner(matched):
-        if matched.group(1):
-            return('\n')
-        else:
-            return(' ')
 
     # append .eml message body_txt to question file
 
@@ -75,54 +59,30 @@ def concat_files(inpath, result):
         message_file.close()
         print(f'msg read')
         body_text = self.get_body(msg)
-        print(f'append body_text: {len(body_text)} chars')
+        print(f'append body_text: {len(body_text)} chars') #DBG
         result.append(body_text)
         return(result)
 
     # Get the text body from an email
-    def get_body(self, msg):
-        # If message is not MIME multipart, get text from base message body
-        if not msg.is_multipart():
-            print('not multipart')
-            body_text = self.get_msg_body(msg)
-        else:
-            print('multipart')
-            part = msg.get_body(preferencelist=('html', 'plain'))
-            if part:
-                print('part found')
-                body_text = self.get_msg_body(part) 
+    def get_body_text(self, msg):
+        part = msg.get_body(preferencelist=('html', 'plain'))
+        content_type = part['content-type']
+        if content_type.maintype == 'text':
+            if content_type.subtype == 'plain':
+                body_text = self.plain_text(part.get_content())
+                print('plain text')#DBG
+            elif content_type.subtype == 'plain':
+                body_text = self.html_text(part.get_content())
+                print('html text')#DBG
             else:
                 body_text = ''
         return(body_text)
 
-    def get_msg_body(self, msg):
-        content = msg.get_content()
-        maintype = msg.get_content_maintype()
-        subtype = msg.get_content_subtype()
-        print(f'content_type: {maintype}/{subtype}')
-        if maintype == 'text':
-            if subtype == 'html':
-                body_text = self.html_text(content)
-                print('converted html to text')
-            elif subtype == 'plain':
-                body_text = content
-            else:
-                body_text = ''
-        else:
-            body_text = ''
-        return(body_text)
+    def plain_text(self, content): #TODO
+        return(content)
 
-        
-
-    # Message is multipart find text parts (sample code, stopped here 2026-02-21 0830)
-    
-    for part in msg.walk():
-        part_type = part.get_content_type()
-        part.get('Content-Disposition') is None
-        if part_type == 'text/plain' or and :
-            # Return the decoded payload (the email body text)
-            return part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8')
-
+    def html_text(self, content): # TODO
+        return(content)
     
 '''
 def append_msg(path, extension, result):
@@ -158,8 +118,9 @@ def message_file_type(filename):
 
     
 class TextParser(HTMLParser):
-    def __init__(self)
-    self.stack = list([])
+    def __init__(self):
+        self.stack = list([])
+    
 
 
 
