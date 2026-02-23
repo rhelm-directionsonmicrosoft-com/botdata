@@ -29,7 +29,7 @@ def get_messages(inpath=inpath, outpath=outpath):
         writer = csv.DictWriter(csv_file, fieldnames=fields, dialect='excel')
         writer.writeheader()
         for message in read_messages(inpath):
-            print(f'{message["subject"]}')
+            # print(f'{message["subject"]}')
             writer.writerow(message)
     csv_file.close()
 
@@ -39,10 +39,11 @@ def read_messages(inpath):
     for filename in os.scandir(inpath):
         message = read_message(filename)
         if target_message(message):
-            print(f'read target sender {message["sender"]}\nsubject {message["subject"]} ') # DBG
+            # print(f'read target sender {message["sender"]}\nsubject {message["subject"]} ') # DBG
             yield(message)
         else:
-            print('read_messages no target message') # DBG
+            pass
+            # print('read_messages no target message') # DBG
 
 # read message file, identify format, and parse to message
 
@@ -60,11 +61,11 @@ def read_message(filename):
             message_source = None
         if message_source:
             message['sender'] = message_source.sender
-            print(f'read_source sender {message_source.sender}\nsubject: {message_source.subject}')
+            # print(f'read_source sender {message_source.sender}\nsubject: {message_source.subject}')
             message['to']= message_source.to
             message['subject'] = message_source.subject
             message['question'] = extract_question(message_source.body)
-            print(f'read question {message["question"]}')
+            # print(f'read question {message["question"]}')
     finally:
         if message_source:
             message_source.close()
@@ -85,18 +86,19 @@ def target_message(message):
 
 subject_pat = re.compile(r'Customer\s+Query\s+from(.*)$', re.IGNORECASE)
 
-question_pat = re.compile(r'in\s+Query(.*?)[-_]{2}', re.IGNORECASE)
+question_pat = re.compile(r'in Query[:](.*?)[-_][-_]|\n\n', re.IGNORECASE | re.MULTILINE)
 
 clean_pat = re.compile(r'\s\s|\S\n\S')
 
-def clean():
+def clean(m):
     return(' ')
 
 
-def extract_question(message):
-    # body = re.sub(clean_pat, clean, message['body']) #DBG
-    m = re.search(question_pat)
+def extract_question(body):
+    body = re.sub(clean_pat, clean, body) #DBG
+    m = re.search(question_pat, body)
     if not m:
+        print('No question match')
         return(None)
     else:
         question = m.group(1) # m.group('question') #DBG
@@ -126,7 +128,7 @@ class EmlMessageSource():
         eml_file.close()
         self.message = message
         self.subject = message['subject']
-        print('EmlMessage source init subject:{message["subject"]}\nsender: {message.sender}')
+        # print('EmlMessage source init subject:{message["subject"]}\nsender: {message.sender}')
         self.to = message['to']
         self.sender =  message['sender']
         self.body = self.get_eml_body(message)
