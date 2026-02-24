@@ -12,9 +12,9 @@ import re
 from random import randint
 
 
-inpath = r"C:\Users\Rob\script\data\botdata_files\interests"
-outpath  = r"C:\Users\Rob\script\data\botdata_files\interests\interests_out.csv"
-outscript  = r"C:\Users\Rob\script\data\botdata_files\interests\interests_script.txt"
+inpath = r"/Users/robhelm/dev/data/botdata/interests"
+outpath  = r"/Users/robhelm/dev/data/botdata/interests/interests_out.csv"
+outscript  = r"/Users/robhelm/dev/data/botdata/interests/interests_script.txt"
 fields = ['sender','to','subject','question']
 outmessage = {
     'sender':'',
@@ -132,9 +132,10 @@ def read_message(filename):
             if body:
                 # re.sub(clean_pat, cleaner, message_source.body) #DBG
                 if body:
-                    #question = extract_question(body)
-                    question = body
+                    question = extract_question(body)
+                    # question = body
                     message['question'] = question
+                    print(f"message['question']={message['question']}")
     finally:
         if message_source:
             message_source.close()
@@ -155,8 +156,8 @@ def target_message(message):
 
 subject_pat = re.compile(r'Customer\s+Query\s+from(.*)$', re.IGNORECASE)
 
-question_pat = re.compile(r'.*', re.IGNORECASE | re.MULTILINE | re.DOTALL)
-# = re.compile(r'(?:Member Question|in Query)[:](.*?)[-_][-_]|\n\n', re.IGNORECASE | re.MULTILINE)
+question_pat = re.compile(r'Query\s*[:](.*?)[-_][-_]|\n\n|[<]\s*Draft\s*Customer', re.IGNORECASE | re.MULTILINE | re.DOTALL)
+# = re.compile(r'(?:Member Question|in Query)[:](.*?)([-_][-_]|\n\n', re.IGNORECASE | re.MULTILINE)
 
 clean_pat = re.compile(r'\s\s|\S\n\S')
 
@@ -173,9 +174,8 @@ def extract_question(body):
         for k, g in enumerate(m.groups()):
             print(f'Lacks group {k}: {g}')
     else:
-        question = m.group(0) # m.group('question') #DBG
-        for k, g in enumerate(m.groups()):
-            print(f'Lacks group {k}: {g}')
+        question = m.group(1) # m.group('question') #DBG
+        print(f'QUESTION FOUND:{m.group(1)}')
     return(question)
         
     
