@@ -1,5 +1,5 @@
 # load_questions.py
-# Extract customer questions from email and Excel files
+# Extract customer questions from folders of email and Excel files
 # Writes to json file via Pandas DataFrame
 
 import os, os.path
@@ -16,97 +16,111 @@ from random import randint
 inpath = r"C:\Users\Rob\script\data\botdata_files\interests"
 outpath  = r"C:\Users\Rob\script\data\botdata_files\interests\interests_out.csv"
 outscript  = r"C:\Users\Rob\script\data\botdata_files\interests\interests_script.txt"
-fields = ['sender','to','subject','question']
+
+class QuestionSource()
+    
+    def __init__(self, path, fields = {}):
+        self.path = path
+        self.parser = None
+        self.fields = fields.copy()
+        self.message = self.fields.copy()
+        self.message['question'] = ''
+
+    def read(self):
+        pass
+
+    # Regular expression to get question in body text
+
+    question_pat = re.compile(
+    r'''Query)[:] # Query: at start of question
+    (.*?)  # Characters in the question
+    # Various markers for end of question
+    [<]Draft\s*Answer #<Draft Answer
+    |[-_][-_] # Repeated hyphen or underline divider
+    \n\s*\n # a blank line''',
+    e.VERBOSE
+    | re.IGNORECASE
+    | re.MULTILINE)
+    
+    def get_question(self,message):
+        m = re.search(question_pat, body)
+    if not m:
+        print('search failed') #DBG
+    elif len(m.groups()) < 1:
+        for k, g in enumerate(m.groups()):
+            print(f'Lacks group {k}: {g}') #DBG
+    else:
+        question = m.group(1) # m.group('question') #DBG
+        if len(question) > 50:
+            q = question[0:49] + '...'
+        else:
+            q = question
+        print(f'Found question {q}')
+    return(question)
+
+
+    clean_pat = re.compile(r'\s\s|\S\n\S')
+
+    def cleaner(m):
+        return(' ')
+
+    def clean(self, message):
+        body = re.sub(clean_pat, cleaner, message['body'])
+        message['body'] = body
+        return(message)
 
 
     
-class EmlSource():
-    outmessage = {
-    'sender':'',
-    'to':'',
-    'subject':'',
-    'question':'',
-    }
-    
-    def __init__(self):
-        self.eml_parser = email.parser.BytesParser(policy=email.policy.default)
-        self.message = None
-        self.subject = ''
-        self.to = ''
-        self.sender = ''
-        self.body = ''
+class EmlSource(QuestionSource):    
+    def __init__(self, path, fields):
+        QuestionSource.__init__(self, path)
+        self.parser = email.parser.BytesParser(policy=email.policy.default)
         # print('EmlSource {self} initialized') #DBG
 
-    def open_eml(self, path):
-        with open(path, mode='rb') as eml_file:
-            message = self.eml_parser.parse(eml_file)
+    def get_field(self, _message, field):
+        if field != 'body':
+            return(_message[field])
+        else: # Get text body of possible multipart message
+            part = message.get_body(preferencelist=('plain', 'html'))
+            content_type = part['content-type']
+            if (not content_type.maintype == 'text'):
+                # print('Not text format, blank body returned')  # DBG
+                body = ' '
+            else:
+                body = part.get_content()
+                # print(f'body format{content_type.maintype}\\{content_type.subtype}') #DBG
+            return(body)
+
+    def read(self):
+        with open(self.path, mode='rb') as eml_file:
+            _message = self.eml_parser.parse(eml_file)
         eml_file.close()
-        self.message = message
-        self.subject = message['subject']
-        self.to = message['to']
-        self.sender =  message['sender']
-        self.body = self.get_body(message)
+        message = self.message.copy()
+        for field in field.keys():
+            message[field] = self.get_field(_message, field)
+        message['question'] = self.get_question(message)
         # print('eml_source.open subject:self.subject}\nsender: {message.sender}') # DBG
-        return(self)
+        return(message)
 
-    def close(self):
-        pass
+class MsgSource(QuestionSource):
+    def __init__(self, path, fields):
+        QuestionSource.__init__(self, path)
+        self.fields = fields.copy()
+        self.message = fields.copy()
+        self.message['question'] = ''
+
+    def read(self):
+        _message = msg.openMsg(self.path)
+        for field in self.fields.keys():
+            message[field] = _message[field]
+        message['question'] = self.get_question(message)
+        return(message)
+
+# TODO 2026-02-25
             
-    # Get the text body from an eml message
-    def get_body(self, message):
-        part = message.get_body(preferencelist=('plain', 'html'))
-        content_type = part['content-type']
-        if (not content_type.maintype == 'text'):
-            # print('Not text format, blank body returned')  # DBG
-            body = ' '
-        else:
-            body = part.get_content()
-            # print(f'body format{content_type.maintype}\\{content_type.subtype}') #DBG
-        return(body)
-
-eml_source = EmlSource() # Reader for .eml messages
-
-# Get e-mail messages from a folder and merge into a CSV file.
-
-# write out scripts for the bot
-
-def write_bracketed(
-    inpath=inpath,
-    outpath=outscript,
-    delay=120*randint(1, 5),
-    MicrosoftLearn=True):
-    with open(outpath, mode='w',encoding='utf-8') as f:
-        print('### Interests e-mailed member questions from 2024 and earlier',file=f)
-        for question in read_questions(inath):
-            if MicrosoftLearn == True:
-                print('USE Microsoft Learn',file=f)
-            print('QUESTION{{' + question.strip() + '}}',file=f)
-            print('DELAY{{' + str(delay) + '}}',file=f)
-        print('### Done',file=f)
-    f.close()
-                      
-
-    
-def load_data(inpath=inpath):
-    with open(outpath, 'w', newline='', encoding='utf-8') as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=fields, dialect='excel')
-        writer.writeheader()
-        for message in read_messages(inpath):
-            # print(f'{message["subject"]}')
-            writer.writerow(message)
-    csv_file.close()
-
-# Read questions in a source folder or directory and return them as read
-
-def read_questions(inpath):
-    for filename in os.scandir(inpath):
-        doc = read_doc(filename)
-        if target_doc(doc):
-            # print(f'read target sender {message["sender"]}\nsubject {message["subject"]} ') # DBG
-            yield(message)
-        else:
-            pass
-            # print('read_messages no target message') # DBG
+class CsvSource(QuestionSource):
+    __init(self, path, fields)__:
+        QuestionSource.__init__(self, path, fields)
 
 # read message file, identify format, and parse to message
 
@@ -153,30 +167,6 @@ def target_message(message):
         m = re.match(subject_pat,subject)
         return(m)
 
-subject_pat = re.compile(r'Customer\s+Query\s+from(.*)$', re.IGNORECASE)
-
-question_pat = re.compile(r'.*', re.IGNORECASE | re.MULTILINE | re.DOTALL)
-# = re.compile(r'(?:Member Question|in Query)[:](.*?)[-_][-_]|\n\n', re.IGNORECASE | re.MULTILINE)
-
-clean_pat = re.compile(r'\s\s|\S\n\S')
-
-def cleaner(m):
-    return(' ')
-
-
-def extract_question(body):
-    question = '' # default value if not found
-    m = re.search(question_pat, body)
-    if not m:
-        print('search failed')
-    elif len(m.groups()) < 1:
-        for k, g in enumerate(m.groups()):
-            print(f'Lacks group {k}: {g}')
-    else:
-        question = m.group(0) # m.group('question') #DBG
-        for k, g in enumerate(m.groups()):
-            print(f'Lacks group {k}: {g}')
-    return(question)
         
     
 def message_file_type(filename):
@@ -193,7 +183,48 @@ def message_file_type(filename):
         # print('message_file_type: not a file') DBG
         return('')
 
+# write out scripts for the bot
 
+def write_bracketed(
+    inpath=inpath,
+    outpath=outscript,
+    delay=120*randint(1, 5),
+    MicrosoftLearn=True):
+    with open(outpath, mode='w',encoding='utf-8') as f:
+        print('### Interests e-mailed member questions from 2024 and earlier',file=f)
+        for question in read_questions(inath):
+            if MicrosoftLearn == True:
+                print('USE Microsoft Learn',file=f)
+            print('QUESTION{{' + question.strip() + '}}',file=f)
+            print('DELAY{{' + str(delay) + '}}',file=f)
+        print('### Done',file=f)
+    f.close()
+
+
+
+
+                 Get e-mail messages from a folder and merge into a CSV file.
+    
+def load_data(inpath=inpath):
+    with open(outpath, 'w', newline='', encoding='utf-8') as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fields, dialect='excel')
+        writer.writeheader()
+        for message in read_messages(inpath):
+            # print(f'{message["subject"]}')
+            writer.writerow(message)
+    csv_file.close()
+
+# Read questions in a source folder or directory and return them as read
+
+def read_questions(inpath):
+    for filename in os.scandir(inpath):
+        doc = read_doc(filename)
+        if target_doc(doc):
+            # print(f'read target sender {message["sender"]}\nsubject {message["subject"]} ') # DBG
+            yield(message)
+        else:
+            pass
+            # print('read_messages no target message') # DBG
 
 '''
 if __name__ == '__main__':
