@@ -17,19 +17,30 @@ inpath = r"C:\Users\Rob\script\data\botdata_files\interests"
 outpath  = r"C:\Users\Rob\script\data\botdata_files\interests\interests_out.csv"
 outscript  = r"C:\Users\Rob\script\data\botdata_files\interests\interests_script.txt"
 
+# Abstract class gets questions from files
+
 class QuestionSource()
-    
-    def __init__(self, path, fields = {}):
-        self.path = path
+
+    # True if filename extension can be processed here
+    # SUBCLASS RESPONSIBILITY
+    def myextension(self, ext):
+        return(False)
+
+    # Read doc with questions
+    # SUBCLASS RESPONSIBILITY
+    def read(self, filepath):
+        pass
+
+        
+    def __init__(self, folderpath=inpath, fields={}):
+        self.folderpath = folderpath
         self.parser = None
         self.fields = fields.copy()
         self.message = self.fields.copy()
         self.message['question'] = ''
 
-    def read(self):
-        pass
 
-    # Regular expression to get question in body text
+    # Get question from body text of a source file
 
     question_pat = re.compile(
     r'''Query)[:] # Query: at start of question
@@ -43,7 +54,8 @@ class QuestionSource()
     | re.MULTILINE)
     
     def get_question(self,message):
-        m = re.search(question_pat, body)
+        message = self.clean(message)
+        m = re.search(question_pat, message['body'])
     if not m:
         print('search failed') #DBG
     elif len(m.groups()) < 1:
@@ -58,6 +70,7 @@ class QuestionSource()
         print(f'Found question {q}')
     return(question)
 
+    # clean up message body before scanning for question
 
     clean_pat = re.compile(r'\s\s|\S\n\S')
 
@@ -70,13 +83,36 @@ class QuestionSource()
         return(message)
 
 
+# get questions from .eml files
+
     
-class EmlSource(QuestionSource):    
+class EmlSource(QuestionSource):
+
+    # True if filename extension can be processed here
+
+    def myextension(self, ext):
+        return(ext == '.eml')
+  
     def __init__(self, path, fields):
-        QuestionSource.__init__(self, path)
+        QuestionSource.__init__(self, path, fields)
         self.parser = email.parser.BytesParser(policy=email.policy.default)
         # print('EmlSource {self} initialized') #DBG
 
+    # Read a message with question from .eml file
+
+    def read(self, filepath):
+        with open(self.filepath, mode='rb') as eml_file:
+            _message = self.eml_parser.parse(eml_file)
+        eml_file.close()
+        message = self.message.copy()
+        for field in field.keys():
+            message[field] = self.get_field(_message, field)
+        message['question'] = self.get_question(message)
+        # print('eml_source.open subject:self.subject}\nsender: {message.sender}') # DBG
+        return(message)
+
+    # Get a field from message being processed.
+    
     def get_field(self, _message, field):
         if field != 'body':
             return(_message[field])
@@ -90,27 +126,25 @@ class EmlSource(QuestionSource):
                 body = part.get_content()
                 # print(f'body format{content_type.maintype}\\{content_type.subtype}') #DBG
             return(body)
+    
 
-    def read(self):
-        with open(self.path, mode='rb') as eml_file:
-            _message = self.eml_parser.parse(eml_file)
-        eml_file.close()
-        message = self.message.copy()
-        for field in field.keys():
-            message[field] = self.get_field(_message, field)
-        message['question'] = self.get_question(message)
-        # print('eml_source.open subject:self.subject}\nsender: {message.sender}') # DBG
-        return(message)
+# Get questions from folder of .msg files
+
 
 class MsgSource(QuestionSource):
+        # True if filename extension can be processed here
+
+    def myextension(self, ext):
+        return(ext == '.msg')
+    
     def __init__(self, path, fields):
         QuestionSource.__init__(self, path)
         self.fields = fields.copy()
         self.message = fields.copy()
         self.message['question'] = ''
 
-    def read(self):
-        _message = msg.openMsg(self.path)
+    def read(self, filepath):
+        _message = msg.openMsg(filepath)
         for field in self.fields.keys():
             message[field] = _message[field]
         message['question'] = self.get_question(message)
@@ -119,53 +153,35 @@ class MsgSource(QuestionSource):
 # TODO 2026-02-25
             
 class CsvSource(QuestionSource):
+    
+        # True if filename extension can be processed here
+
+    def myextension(self, ext):
+        return(ext == '.csv')
+    
     __init(self, path, fields)__:
         QuestionSource.__init__(self, path, fields)
+        self.buffer = pd.DataFrame(filepath, columns = list(self.message.keys()))
 
-# read message file, identify format, and parse to message
+    def read(self, filepath):
+        with pd.ExcelFile(filepath) as xlfile:
+            self.buffer = concat_worksheets(xlfile, filepath, self.buffer
+        xlfile.close()
+        
+                                            
+    def concat_worksheets(xlfile, filepath, buffer):
+        sheet_names = xlfile.sheet_names
+        for n in sheet_names:
+            print(f'concat_worksheet {n}')
+            new_sheet = pd.DataFrame = pd.read_excel(xlfile, n)
+            new_sheet.name = n
+            new_sheet.insert(len(new_sheet.columns), "source_path", str(path))
+            new_sheet.insert(len(new_sheet.columns), "source_sheet", n)
+            result = pd.concat([result, new_sheet], ignore_index=True)
+        print(f'concat_worksheets {result.info()}')
 
-def read_message(filename):
-    path = filename.path
-    ext = message_file_type(filename)
-    message = dict(outmessage)
-    try:    
-        if ext == '.msg': # Outlook binary format
-            message_source = msg.openMsg(path)
-        elif ext == '.eml': # Quasi-standard SMTP/IMAP format
-            message_source = eml_source.open_eml(path)
-        else:
-            # DBG print(f'Not a known message format')
-            message_source = None
-        if message_source:
-            message['sender'] = message_source.sender
-            # print(f'read_source sender {message_source.sender}\nsubject: {message_source.subject}') #DBG
-            message['to']= message_source.to
-            message['subject'] = message_source.subject
-            message['question'] = '' # default value if not found in body
-            body = message_source.body
-            if body:
-                # re.sub(clean_pat, cleaner, message_source.body) #DBG
-                if body:
-                    #question = extract_question(body)
-                    question = body
-                    message['question'] = question
-    finally:
-        if message_source:
-            message_source.close()
-            # print(f'read_message: {message["subject"]}') # DBG
-        else:
-            pass
-            # print('read_message: none') #DBG
-    return(message)
-
-def target_message(message):
-    return(True) #DBG
-    subject = message.get('subject', None)
-    if subject == None:
-        return(False)
-    else:
-        m = re.match(subject_pat,subject)
-        return(m)
+    def read(self):
+        
 
         
     
@@ -182,6 +198,18 @@ def message_file_type(filename):
     else:
         # print('message_file_type: not a file') DBG
         return('')
+
+
+
+    
+
+    # Read all question files in a folder, return one by one
+
+    def read_questions():
+        for filename in os.scandir(self.path):
+            doc = read_doc(filename)
+            if target_doc(doc):
+                yield(doc)
 
 # write out scripts for the bot
 
@@ -214,17 +242,9 @@ def load_data(inpath=inpath):
             writer.writerow(message)
     csv_file.close()
 
-# Read questions in a source folder or directory and return them as read
+# Read questions in a source folder and return them as read
 
-def read_questions(inpath):
-    for filename in os.scandir(inpath):
-        doc = read_doc(filename)
-        if target_doc(doc):
-            # print(f'read target sender {message["sender"]}\nsubject {message["subject"]} ') # DBG
-            yield(message)
-        else:
-            pass
-            # print('read_messages no target message') # DBG
+
 
 '''
 if __name__ == '__main__':
